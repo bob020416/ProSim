@@ -1,6 +1,7 @@
 import argparse
 import glob
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -25,7 +26,10 @@ BKT_METRICS = {
 
 def maybe_float(value):
   try:
-    return float(str(value).strip().strip('"'))
+    numeric_value = float(str(value).strip().strip('"'))
+    if not math.isfinite(numeric_value):
+      return None
+    return numeric_value
   except Exception:
     return None
 

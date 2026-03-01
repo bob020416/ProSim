@@ -95,15 +95,28 @@ def check_mem_usage(pid):
 
   return data
 
+def _is_stale_status_file(status_file):
+  if not status_file.exists():
+    return False
+
+  try:
+    pid_str = status_file.read_text().strip()
+    pid = int(pid_str)
+  except Exception:
+    return True
+
+  return not psutil.pid_exists(pid)
+
 def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, save_rollout, top_k, traj_noise_std, action_noise_std, sampler_cfg=None, smooth_dist=5.0, save_vis=False, vis_interval=0, vis_max_scenes=0, vis_fps=10):
   # print_system_mem_usage()
 
   dataset = registry.get_dataset("prosim_imitation")(config, 'rollout', centric='scene')
   print(f'{os.getpid()} initialized dataset')
-  
-  config.ROLLOUT.POLICY['TOP_K'] = top_k
+
+  effective_top_k = config.ROLLOUT.POLICY.TOP_K if top_k is None else top_k
+  config.ROLLOUT.POLICY['TOP_K'] = effective_top_k
   config.MODEL.POLICY.ACT_DECODER['RANDOM_NOISE_STD'] = action_noise_std
-  print('set top_k: ', top_k, flush=True)
+  print('set top_k: ', effective_top_k, flush=True)
   print('config.ROLLOUT.POLICY: ', config.ROLLOUT.POLICY, flush=True)
   print('traj noise std: ', traj_noise_std, flush=True)
   print('action noise std: ', action_noise_std, flush=True)
@@ -129,7 +142,7 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
   save_root = os.path.join(config.SAVE_DIR, config.EXPERIMENT_DIR, str(exp_name))
   save_root = Path(save_root)
 
-  rollout_root = save_root/ 'rollout' / f'{rollout_id}_{M}_top_{top_k}'
+  rollout_root = save_root/ 'rollout' / f'{rollout_id}_{M}_top_{effective_top_k}'
 
   status_path = rollout_root / 'status'
   status_path.mkdir(parents=True, exist_ok=True)
@@ -162,12 +175,6 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
   for loop_idx, scene_idx in enumerate(tqdm.tqdm(all_scene_idx, desc=f'rollout on {os.getpid()}')):
     status_file = status_path / f'scene_{scene_idx}.start'
 
-    if status_file.exists():
-      print(f'other process already work on scene {scene_idx} ', flush=True)
-      continue
-
-    os.system('touch ' + str(status_file))
-
     rollout_file = rollout_path / f'scene_{scene_idx}.pb'
     metric_file = metrics_path / f'scene_{scene_idx}.json'
 
@@ -180,7 +187,21 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
       result_exists = metric_file.exists()
     
     if result_exists:
+      if status_file.exists():
+        status_file.unlink()
       print(f'process({os.getpid()}): scene {scene_idx} already exists', flush=True)
+      continue
+
+    if _is_stale_status_file(status_file):
+      print(f'process({os.getpid()}): removing stale lock for scene {scene_idx}', flush=True)
+      status_file.unlink()
+
+    try:
+      fd = os.open(status_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+      os.write(fd, str(os.getpid()).encode())
+      os.close(fd)
+    except FileExistsError:
+      print(f'other process already work on scene {scene_idx} ', flush=True)
       continue
 
     try:
@@ -199,7 +220,7 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
       start = time.time()
       with torch.no_grad():
           batch, waymo_scene, ego_sim_agent_id = get_waymo_specification(batch, config)
-          result_M = parallel_rollout_batch(batch, M, model, top_K=top_k, sampler_model=sampler_model, smooth_dist=smooth_dist)
+          result_M = parallel_rollout_batch(batch, M, model, top_K=effective_top_k, sampler_model=sampler_model, smooth_dist=smooth_dist)
           rollout_trajs_in_world_M, object_ids_M = obtain_rollout_trajs_in_world(batch, result_M, traj_noise_std)
 
       for rollout_idx, rollout_trajs_in_world in enumerate(rollout_trajs_in_world_M):
@@ -252,12 +273,10 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
 
         print(f'process({os.getpid()}): save metric scene {scene_idx} to {metric_file}', flush=True)
 
-      if status_file.exists():
-        status_file.unlink()
-
     except Exception as e:
       print(f'process({os.getpid()}): error in scene {scene_idx}: {e}', flush=True)
       traceback.print_exc()
+    finally:
       if status_file.exists():
         status_file.unlink()
 

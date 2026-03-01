@@ -33,6 +33,7 @@ prosim/dataset/prosim_instruct_520k/
 prosim/result/
 prosim_demo/ckpt/
 eval.txt
+.trajdata_cache_debug/
 
 # Large media assets
 assets/*.mp4
