@@ -1,0 +1,23 @@
+  python prosim/rollout/run_distributed_rollout.py \
+    --config prosim_demo/cfg/no_text.yaml,prosim_demo/cfg/uncond_random10.yaml \
+    --ckpt /media/user/volume_0/yuhsiang/ProSim/prosim_demo/ckpt/prosim_demo_model.ckpt \
+    --rollout_name wosac_val_random10_uncond_test \
+    --save_vis true \
+    --cluster local && \
+  python prosim/rollout/run_distributed_rollout.py \
+    --config prosim_demo/cfg/no_text.yaml,prosim_demo/cfg/sketch_only_random10.yaml \
+    --ckpt /media/user/volume_0/yuhsiang/ProSim/prosim_demo/ckpt/prosim_demo_model.ckpt \
+    --rollout_name wosac_val_random10_sketch_only \
+    --save_vis true \
+    --cluster local 
+
+  python prosim/rollout/run_distributed_rollout.py \
+    --config prosim_demo/cfg/no_text.yaml,prosim_demo/cfg/text_only_random10.yaml \
+    --ckpt /media/user/volume_0/yuhsiang/ProSim/prosim_demo/ckpt/prosim_demo_model.ckpt \
+    --rollout_name wosac_val_random10_text_only \
+    --cluster local && \
+  python prosim/rollout/run_distributed_rollout.py \
+    --config prosim_demo/cfg/no_text.yaml,prosim_demo/cfg/full4_random10.yaml \
+    --ckpt /media/user/volume_0/yuhsiang/ProSim/prosim_demo/ckpt/prosim_demo_model.ckpt \
+    --rollout_name wosac_val_random10_full4 \
+    --cluster local
