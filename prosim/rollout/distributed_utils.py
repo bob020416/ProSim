@@ -123,10 +123,12 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
   
   model_cls = registry.get_model(config.MODEL.TYPE)
   model = model_cls.load_from_checkpoint(ckpt_path, config=config, map_location='cpu', strict=False)
+  model.eval()
   print(f'{os.getpid()} initialized model from {ckpt_path}')
 
   if sampler_cfg is not None and sampler_cfg != 'None':
     sampler_model, _ = get_model_and_config(sampler_cfg)
+    sampler_model.eval()
     print(f'{os.getpid()} initialized sampler model from {sampler_cfg}')
   else:
     sampler_model = None

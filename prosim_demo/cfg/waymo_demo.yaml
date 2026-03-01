@@ -46,7 +46,7 @@ ROLLOUT:
     POLICY_FREQ: 80
     MAX_STEPS: 80
     POLICY_START_FRAME: 10
-    TOP_K: 1
+    TOP_K: 5
 
 TASK:
   TYPES: ['motion_pred']

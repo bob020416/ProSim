@@ -1,0 +1,10 @@
+EXPERIMENT_NAME: goal_tag_dragpoint_text_fix_1.0_uncond_scene7_only
+
+DATASET:
+  DATA_LIST:
+    MODE: scene
+    ROLLOUT: wosac_scene7_only.txt
+
+PROMPT:
+  CONDITION:
+    TYPES: []

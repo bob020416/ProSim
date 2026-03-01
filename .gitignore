@@ -22,19 +22,15 @@ venv/
 
 */data_indexes/*
 
-# Project-specific large or generated artifacts
+# Project-specific data and generated artifacts
 data/
 ckpt/
 demo_dataset/
 outputs/
 logs/
+trajdata_cache/
+.trajdata_cache_debug/
 prosim/prosim_instruct_520k/
 prosim/dataset/prosim_instruct_520k/
 prosim/result/
 prosim_demo/ckpt/
-eval.txt
-.trajdata_cache_debug/
-
-# Large media assets
-assets/*.mp4
-assets/*.gif
