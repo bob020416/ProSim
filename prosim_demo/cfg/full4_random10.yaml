@@ -1,0 +1,10 @@
+EXPERIMENT_NAME: goal_tag_dragpoint_text_fix_1.0_full4_random10
+
+DATASET:
+  DATA_LIST:
+    MODE: scene
+    ROLLOUT: wosac_val_random10_seed0.txt
+
+PROMPT:
+  CONDITION:
+    TYPES: ['goal', 'v_action_tag', 'drag_point', 'llm_text_OneText']

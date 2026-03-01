@@ -1,0 +1,39 @@
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+*.log
+*.pth
+*.ckpt
+*.pt
+*.npy
+*.npz
+*.zip
+*.tar.gz
+.DS_Store
+
+# Local env and caches
+.env
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+*/data_indexes/*
+
+# Project-specific large or generated artifacts
+data/
+ckpt/
+demo_dataset/
+outputs/
+logs/
+prosim/prosim_instruct_520k/
+prosim/dataset/prosim_instruct_520k/
+prosim/result/
+prosim_demo/ckpt/
+eval.txt
+
+# Large media assets
+assets/*.mp4
+assets/*.gif
