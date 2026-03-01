@@ -11,4 +11,7 @@ DATASET:
 
 PROMPT:
   CONDITION:
-    TYPES: []
+    SAMPLE_MODE:
+      ROLLOUT: 'none'
+    RANDOM_SAMPLE:
+      ROLLOUT: False
