@@ -63,16 +63,17 @@ PROMPT:
     
   CONDITION:
     TYPES: ['goal', 'v_action_tag', 'drag_point']
-
     SAMPLE_MODE:
       TRAIN: 'normal_sample_rate'
       VAL: 'none'
-    
+      ROLLOUT: 'none'
+
     SAMPLE_RATE: 1.0
-    
+
     RANDOM_SAMPLE:
       TRAIN: True
       VAL: False
+      ROLLOUT: False
   
     MAX_COND_PER_SCENE: 128
 

@@ -55,19 +55,27 @@ default_trajdata_cfg = {
     }
 
 label_list_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prosim_instruct_520k')
-all_label_lists = {}
-for split in ['train', 'val']:
-    with open(os.path.join(label_list_dir, f'waymo_{split}_IDs.pkl'), 'rb') as f:
-        all_label_lists[split] = pickle.load(f)
+_all_label_lists = {}
+
+def _load_label_list(split):
+    if split not in _all_label_lists:
+        pkl_path = os.path.join(label_list_dir, f'waymo_{split}_IDs.pkl')
+        with open(pkl_path, 'rb') as f:
+            _all_label_lists[split] = pickle.load(f)
+    return _all_label_lists[split]
 
 
 def get_prosim_instruct_520k_scene_id(batch_ele, split):
     if split == 'rollout':
         split = 'val'
 
+    try:
+        label_list = _load_label_list(split)
+    except FileNotFoundError:
+        return None
+
     row = batch_ele.cache.scene_data_df.loc[('ego', 0)]
     hash_df = (row["x"].item(), row["y"].item())
-    label_list = all_label_lists[split]
 
     if hash_df not in label_list:
         return None

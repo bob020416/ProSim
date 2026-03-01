@@ -1,0 +1,17 @@
+EXPERIMENT_NAME: goal_tag_dragpoint_text_fix_1.0_uncond_val
+
+DATASET:
+  SKIP_CACHE_CHECK: True
+  CACHE_MAP: False
+  SOURCE:
+    ROLLOUT: ['waymo_val']
+  DATA_LIST:
+    MODE: scene
+    ROLLOUT: waymo_val_10scenes.txt
+
+PROMPT:
+  CONDITION:
+    SAMPLE_MODE:
+      ROLLOUT: 'none'
+    RANDOM_SAMPLE:
+      ROLLOUT: False

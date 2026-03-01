@@ -38,3 +38,7 @@ eval.txt
 # Large media assets
 assets/*.mp4
 assets/*.gif
+
+trajdata_cache/
+trajdata_cache2/
+.claude/

@@ -1,9 +1,13 @@
 EXPERIMENT_NAME: goal_tag_dragpoint_text_fix_1.0_uncond_random10
 
 DATASET:
+  SKIP_CACHE_CHECK: True
+  CACHE_MAP: False
+  SOURCE:
+    ROLLOUT: ['waymo_train']
   DATA_LIST:
     MODE: scene
-    ROLLOUT: wosac_val_random10_seed0.txt
+    ROLLOUT: waymo_train_16scenes.txt
 
 PROMPT:
   CONDITION:

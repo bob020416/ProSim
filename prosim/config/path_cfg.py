@@ -13,11 +13,11 @@ data_dir = os.path.join(os.path.dirname(code_dir), 'demo_dataset')
 label_dir = os.path.dirname(os.path.dirname(code_dir))
 
 ROOT_DIR = code_dir
-TRAJDATA_CACHE_DIR = "/media/user/volume_0/yuhsiang/VBD/testing_results/WOSAC/trajdata_cache"
-WAYMO_DATA_DIR = "/media/user/volume_0/yuhsiang/VBD/testing_results/WOSAC"
+TRAJDATA_CACHE_DIR = "/home/msc-auto/wjchang/ProSim/trajdata_cache2"
+WAYMO_DATA_DIR = "/media/msc-auto/HDD/dataset/waymo_tfrecord_v1_3"
 DEMO_DATA_DIR = TRAJDATA_CACHE_DIR
-LLM_MODEL_DIR = "/media/user/volume_0/yuhsiang/ProSim/prosim_demo/ckpt/Meta-Llama-3-8B-Instruct"
-PROSIM_INSTRUCT_520K_DATA_DIR = "/media/user/volume_0/yuhsiang/ProSim/prosim/prosim_instruct_520k"
+LLM_MODEL_DIR = "/media/msc-auto/HDD/wjchang/hf_checkpoints/Meta-Llama-3-8B-Instruct"
+PROSIM_INSTRUCT_520K_DATA_DIR = "/media/msc-auto/HDD/wjchang/prosim/prosim_instruct_520k_mini"
 MOTION_TAG_PATH = os.path.join(PROSIM_INSTRUCT_520K_DATA_DIR, 'tag_prompts')
 TEXT_PROMPT_PATH = os.path.join(PROSIM_INSTRUCT_520K_DATA_DIR, 'text_prompts')
 RESULT_PATH = os.path.join(ROOT_DIR, 'result')
