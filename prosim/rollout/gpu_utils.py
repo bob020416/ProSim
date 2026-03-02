@@ -227,57 +227,42 @@ def sample_M_goal_cond_to_batch(batch, sample_result, top_K, M, stop_smooth_num=
   return batch
 
 def parallel_rollout_batch(batch, M, model, top_K=3, sampler_model=None, smooth_dist=5.0):
+  """Run M independent forward passes and stack results.
+
+  Aligned with reference: each rollout is a full independent model.forward()
+  call so that any stochastic sampling produces diverse rollouts.
+  """
   with torch.no_grad():
-    import time
+    list_result_M = []
+    for i in range(M):
+      result_M = model.forward(batch, 'val')['motion_pred']
+      list_result_M.append(result_M)
 
-    # start = time.time()
-    scene_embs = model.encode_scene(batch)
-    # print('encode scene: ', time.time() - start)
+    # Stack trajectories across M rollouts
+    combined_result = {'motion_pred': {'rollout_trajs': {}}}
 
-    # start = time.time()
-    prompt_encs = model.encode_prompt(batch)
-    # print('encode prompt', time.time() - start)
+    first_result = list_result_M[0]
+    for key in first_result['rollout_trajs'].keys():
+      trajs = [r['rollout_trajs'][key]['traj'] for r in list_result_M]
+      stacked_trajs = torch.stack(trajs, dim=0)  # (M, T, 4)
+      init_pos = [r['rollout_trajs'][key]['init_pos'] for r in list_result_M]
+      init_heading = [r['rollout_trajs'][key]['init_heading'] for r in list_result_M]
+      stacked_init_pos = torch.stack(init_pos, dim=0)
+      stacked_init_heading = torch.stack(init_heading, dim=0)
+      combined_result['motion_pred']['rollout_trajs'][key] = {
+        'traj': stacked_trajs,
+        'init_pos': stacked_init_pos,
+        'init_heading': stacked_init_heading,
+      }
 
-    # start = time.time()
-    # print('decode policy: ', time.time() - start)
-
-    policy_agent_ids = {task: batch.extras['prompt'][task]['agent_ids'] for task in ['motion_pred']}
-    all_t_indices = sorted(batch.extras['all_t_indices'].cpu().numpy().tolist())
-    agent_trajs = model.init_agent_trajs(policy_agent_ids, batch)
-
-
-    if sampler_model is None:
-      policy_emds = model.generate_policy(batch, scene_embs, prompt_encs)
-
-      scene_embs_M, policy_emds_M, _, policy_agent_ids_M, agent_trajs_M, batch = replica_batch_for_parallel_rollout(scene_embs, policy_emds, prompt_encs, policy_agent_ids, agent_trajs, batch, M)
-    else:
-      print(f'using sampler model to get top_K={top_K} goal conditions for {M} replicas with smooth_dist={smooth_dist}')
-
-      sample_result = sampler_model.forward(batch, 'val')
-
-      # print(sample_result['motion_pred']['pair_names'])
-      # print(sample_result['motion_pred']['goal_point'])
-      # print(sample_result['motion_pred']['goal_prob'])
-
-      scene_embs_M, _, prompt_encs_M, policy_agent_ids_M, agent_trajs_M, batch = replica_batch_for_parallel_rollout(scene_embs, None, prompt_encs, policy_agent_ids, agent_trajs, batch, M)
-
-      batch = sample_M_goal_cond_to_batch(batch, sample_result, top_K, M, stop_smooth_num=smooth_dist)
-
-      policy_emds_M = model.generate_policy(batch, scene_embs_M, prompt_encs_M)
-
-    # end = time.time()
-    # print('replica_batch_for_parallel_rollout: ', end - start)
-
-    # print(all_t_indices)
-
-    # start = time.time()
-    model.mode = 'rollout'
-    result_M = model.rollout_batch(batch, scene_embs_M, policy_emds_M, policy_agent_ids_M, agent_trajs_M, all_t_indices, 'rollout')
-    # print('rollout_batch full: ', time.time() - start)
-  
-  return result_M
+    return combined_result
 
 def obtain_rollout_trajs_in_world(batch, result_M, noise_std=0.0):
+  """Convert rollout results to world coordinates.
+
+  Aligned with reference: handles stacked (A, M, T, 4) trajectory format
+  and returns (M, A, T, 3) numpy array with a single object_ids list.
+  """
   batch_ids = []
   object_ids = []
 
@@ -288,7 +273,7 @@ def obtain_rollout_trajs_in_world(batch, result_M, noise_std=0.0):
   for agent_name, results in result_M['motion_pred']['rollout_trajs'].items():
     batch_id = int(agent_name.split('-')[0])
     object_id = agent_name.split('-')[1]
-    
+
     batch_ids.append(batch_id)
     object_ids.append(object_id)
     trajs.append(results['traj'])
@@ -296,15 +281,20 @@ def obtain_rollout_trajs_in_world(batch, result_M, noise_std=0.0):
     init_heads.append(results['init_heading'])
 
   batch_ids = torch.tensor(batch_ids)
-  trajs = torch.stack(trajs, axis=0)
-  init_pos = torch.stack(init_pos, axis=0)
-  init_heads = torch.stack(init_heads, axis=0)
+  trajs = torch.stack(trajs, axis=0)      # (A, M, T, 4)
+  init_pos = torch.stack(init_pos, axis=0)      # (A, M, 2)
+  init_heads = torch.stack(init_heads, axis=0)  # (A, M, 1)
 
   print('trajs shape: ', trajs.shape)
+  A, M, T, _ = trajs.shape
 
   if noise_std > 0.0:
     print('WARNING: adding noise to the rollout trajectories with std: ', noise_std)
-    trajs[:, :, :2] += torch.randn_like(trajs[:, :, :2]) * noise_std
+    trajs[:, :, :, :2] += torch.randn_like(trajs[:, :, :, :2]) * noise_std
+
+  trajs = trajs.reshape(-1, T, 4)       # (AM, T, 4)
+  init_pos = init_pos.reshape(-1, 2)    # (AM, 2)
+  init_heads = init_heads.reshape(-1, 1) # (AM, 1)
 
   # transform all trajectories to the starting frame's coordinate system
   xys_in_center = batch_rotate_2D(trajs[:, :, :2], init_heads) + init_pos[:, None]
@@ -318,17 +308,15 @@ def obtain_rollout_trajs_in_world(batch, result_M, noise_std=0.0):
   hs_in_world = batch_nd_transform_angles_pt(hs_in_centers, center_to_world_tf)
 
   rollout_trajs_in_world = torch.cat([xys_in_world, hs_in_world[:, :, None]], axis=-1)
+  rollout_trajs_in_world = rollout_trajs_in_world.reshape(A, M, T, 3)
 
-  rollout_trajs_in_world_M = []
   object_ids_M = []
-
   for batch_id in set(batch_ids.tolist()):
     batch_mask = batch_ids == batch_id
-    
-    rollout_trajs_in_world_M.append(rollout_trajs_in_world[batch_mask].detach().cpu().numpy())
     object_ids_M.append([object_ids[i] for i in range(len(object_ids)) if batch_mask[i]])
-  
-  return rollout_trajs_in_world_M, object_ids_M
+
+  # return (M, A, T, 3) numpy array and single object_ids list
+  return rollout_trajs_in_world.permute(1, 0, 2, 3).detach().cpu().numpy(), object_ids_M[0]
 
 def joint_scene_from_rollout(waymo_scene, rollout_trajs, object_ids, ego_sim_agent_id):
   joint_trajs = rollout_trajs
@@ -351,13 +339,27 @@ def joint_scene_from_rollout(waymo_scene, rollout_trajs, object_ids, ego_sim_age
   return joint_scene
 
 def obtain_waymo_scenario_rollouts(waymo_scene, rollout_trajs_in_world_M, object_ids_M, ego_sim_agent_id):
+  """Build Waymo scenario rollouts from M rollout results.
+
+  Aligned with reference: rollout_trajs_in_world_M is (M, A, T, 3) numpy array,
+  object_ids_M is a single list of agent id strings.
+  Handles remainder when M doesn't evenly divide 32.
+  """
   M = len(rollout_trajs_in_world_M)
 
+  num_complete_sets = 32 // M
+  remainder = 32 % M
+
   joint_scenes = []
-  for j in range(32 // M):
+  for j in range(num_complete_sets):
     for i in range(M):
-      joint_scene = joint_scene_from_rollout(waymo_scene, rollout_trajs_in_world_M[i], object_ids_M[i], ego_sim_agent_id)
+      joint_scene = joint_scene_from_rollout(waymo_scene, rollout_trajs_in_world_M[i], object_ids_M, ego_sim_agent_id)
       joint_scenes.append(joint_scene)
+
+  for i in range(remainder):
+    idx = i % M
+    joint_scene = joint_scene_from_rollout(waymo_scene, rollout_trajs_in_world_M[idx], object_ids_M, ego_sim_agent_id)
+    joint_scenes.append(joint_scene)
 
   batch_rollouts = sim_agents_submission_pb2.ScenarioRollouts(
     joint_scenes=joint_scenes, scenario_id=waymo_scene.scenario_id)
