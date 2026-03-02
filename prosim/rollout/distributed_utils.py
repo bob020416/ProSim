@@ -95,6 +95,89 @@ def check_mem_usage(pid):
 
   return data
 
+def modify_batch_condition(batch, type_control_nidx_dict, type_input_dict):
+    """Clear all conditions from batch. Ported from reference codebase.
+
+    When called with empty dicts ({}, {}), this zeros all condition masks
+    so the model runs the same path as training agents without conditions.
+    """
+    all_agent_names = batch.extras['prompt']['motion_pred']['agent_ids'][0]
+    controlled_agent_names = []
+
+    if type(batch.extras['condition']) is not dict:
+        batch.extras['condition'] = batch.extras['condition'].all_cond
+
+    for ptype in type_control_nidx_dict.keys():
+        control_indices = type_control_nidx_dict[ptype]
+        for idx in control_indices:
+            aname = all_agent_names[idx]
+            if aname not in controlled_agent_names:
+                controlled_agent_names.append(aname)
+
+    if 'v_action_tag' in batch.extras['condition'].keys():
+        del batch.extras['condition']['v_action_tag']
+
+    for ptype in batch.extras['condition'].keys():
+        cond_data = batch.extras['condition'][ptype]
+
+        if ptype == 'llm_text_OneText':
+            batch.extras['condition'][ptype]['mask'][0] = False
+            batch.extras['condition'][ptype]['prompt_mask'][0, :] = False
+            continue
+        elif ptype not in type_control_nidx_dict:
+            batch.extras['condition'][ptype]['mask'][0, :] = False
+            batch.extras['condition'][ptype]['prompt_mask'][0, :] = False
+            continue
+
+        prompt_inputs = cond_data['input'][0]
+        prompt_masks = cond_data['mask'][0, :]
+        prompt_idxes = cond_data['prompt_idx'][0, :, 0]
+        prompt_pmasks = cond_data['prompt_mask'][0, :]
+
+        if ptype not in type_input_dict:
+            type_input_dict[ptype] = {}
+
+        for cidx, pidx in enumerate(prompt_idxes):
+            if pidx not in type_control_nidx_dict[ptype]:
+                prompt_masks[cidx] = False
+                prompt_pmasks[pidx] = False
+            else:
+                prompt_masks[cidx] = True
+                prompt_pmasks[pidx] = True
+                if pidx.item() in type_input_dict[ptype]:
+                    prompt_inputs[cidx] = type_input_dict[ptype][pidx.item()]
+                else:
+                    type_input_dict[ptype][pidx.item()] = prompt_inputs[pidx]
+
+        batch.extras['condition'][ptype]['input'][0] = prompt_inputs
+        batch.extras['condition'][ptype]['mask'][0] = prompt_masks
+        batch.extras['condition'][ptype]['prompt_mask'][0] = prompt_pmasks
+
+    for ptype in type_control_nidx_dict:
+        if ptype in batch.extras['condition'].keys():
+            continue
+        prompt_inputs = []
+        prompt_masks = []
+        prompt_idx = []
+        for pidx in type_control_nidx_dict[ptype]:
+            prompt_inputs.append(type_input_dict[ptype][pidx])
+            prompt_idx.append(pidx)
+            prompt_masks.append(True)
+
+        prompt_inputs = torch.stack(prompt_inputs)[None, :]
+        prompt_idx = torch.tensor(prompt_idx)[None, :]
+        prompt_masks = torch.tensor(prompt_masks)[None, :]
+        prompt_pmasks = torch.tensor(prompt_masks)
+
+        batch.extras['condition'][ptype] = {}
+        batch.extras['condition'][ptype]['input'] = prompt_inputs
+        batch.extras['condition'][ptype]['mask'] = prompt_masks
+        batch.extras['condition'][ptype]['prompt_mask'] = prompt_pmasks
+        batch.extras['condition'][ptype]['prompt_idx'] = prompt_idx
+
+    return batch, type_input_dict, controlled_agent_names
+
+
 def _is_stale_status_file(status_file):
   if not status_file.exists():
     return False
@@ -123,6 +206,7 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
   
   model_cls = registry.get_model(config.MODEL.TYPE)
   model = model_cls.load_from_checkpoint(ckpt_path, config=config, map_location='cpu', strict=False)
+  model.eval()
   print(f'{os.getpid()} initialized model from {ckpt_path}')
 
   if sampler_cfg is not None and sampler_cfg != 'None':
@@ -220,6 +304,14 @@ def rollout_scene_distributed(config, M, ckpt_path, rollout_id, save_metric, sav
       start = time.time()
       with torch.no_grad():
           batch, waymo_scene, ego_sim_agent_id = get_waymo_specification(batch, config)
+
+          # Unconditional rollout: zero all condition masks
+          # This matches the reference: modify_batch_condition(batch, {}, {})
+          if getattr(config.ROLLOUT, 'UNCOND', False):
+            batch = modify_batch_condition(batch, {}, {})[0]
+            if 'llm_text_OneText' in batch.extras['condition']:
+              batch.extras['condition']['llm_text_OneText']['mask'][0] = False
+
           result_M = parallel_rollout_batch(batch, M, model, top_K=effective_top_k, sampler_model=sampler_model, smooth_dist=smooth_dist)
           rollout_trajs_in_world_M, object_ids_M = obtain_rollout_trajs_in_world(batch, result_M, traj_noise_std)
 

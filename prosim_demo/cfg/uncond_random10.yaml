@@ -9,6 +9,9 @@ DATASET:
     MODE: scene
     ROLLOUT: waymo_train_16scenes.txt
 
+ROLLOUT:
+  UNCOND: True
+
 PROMPT:
   CONDITION:
     SAMPLE_MODE:

@@ -62,7 +62,7 @@ PROMPT:
     USE_AGENT_TYPE: True
     
   CONDITION:
-    TYPES: ['goal', 'v_action_tag', 'drag_point']
+    TYPES: ['goal', 'v_action_tag', 'drag_point', 'llm_text_OneText']
     SAMPLE_MODE:
       TRAIN: 'normal_sample_rate'
       VAL: 'none'
