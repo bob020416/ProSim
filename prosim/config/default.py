@@ -151,6 +151,7 @@ _C.ROLLOUT.VISUALIZE.FPS = 10
 _C.ROLLOUT.VISUALIZE.GIF_FREQ = 1
 
 _C.ROLLOUT.ONLINE_M = 1
+_C.ROLLOUT.UNCOND = False
 
 # -----------------------------------------------------------------------------
 # DATASET CONFIG

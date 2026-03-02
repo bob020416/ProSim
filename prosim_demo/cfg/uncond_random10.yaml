@@ -1,5 +1,8 @@
 EXPERIMENT_NAME: goal_tag_dragpoint_text_fix_1.0_uncond_random10
 
+ROLLOUT:
+  UNCOND: True
+
 DATASET:
   SKIP_CACHE_CHECK: True
   CACHE_MAP: False
