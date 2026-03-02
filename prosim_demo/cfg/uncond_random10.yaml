@@ -14,6 +14,7 @@ DATASET:
 
 PROMPT:
   CONDITION:
+    TYPES: ['llm_text_OneText']
     SAMPLE_MODE:
       ROLLOUT: 'none'
     RANDOM_SAMPLE:

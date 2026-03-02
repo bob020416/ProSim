@@ -14,6 +14,9 @@ DATASET:
 
 PROMPT:
   CONDITION:
+    # Match reference: only llm_text_OneText so condition transformer
+    # sees the same structure as the reference uncond rollout
+    TYPES: ['llm_text_OneText']
     SAMPLE_MODE:
       ROLLOUT: 'none'
     RANDOM_SAMPLE:
