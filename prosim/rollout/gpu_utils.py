@@ -233,8 +233,23 @@ def parallel_rollout_batch(batch, M, model, top_K=3, sampler_model=None, smooth_
   call so that any stochastic sampling produces diverse rollouts.
   """
   with torch.no_grad():
+    # step_env writes rollout predictions back into batch.extras['fut_obs'] in-place
+    # (fut_obs['input'], ['position'], ['heading'], ['mask']). Snapshot the tensors
+    # before the loop so every rollout starts from the original observations.
+    fut_obs_snapshot = {
+      t: {k: v.clone() if isinstance(v, torch.Tensor) else v
+          for k, v in obs.items()}
+      for t, obs in batch.extras['fut_obs'].items()
+    }
+
     list_result_M = []
     for i in range(M):
+      # Restore fut_obs to its original state before each independent rollout.
+      for t, obs_snapshot in fut_obs_snapshot.items():
+        for k, v in obs_snapshot.items():
+          if isinstance(v, torch.Tensor):
+            batch.extras['fut_obs'][t][k].copy_(v)
+
       result_M = model.forward(batch, 'val')['motion_pred']
       list_result_M.append(result_M)
 

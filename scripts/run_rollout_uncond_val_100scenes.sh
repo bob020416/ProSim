@@ -8,7 +8,7 @@ cd "$SCRIPT_DIR/.."
 bash scripts/run_prosim.sh prosim/rollout/run_distributed_rollout.py \
   --config prosim_demo/cfg/no_text.yaml,prosim_demo/cfg/uncond_val_100scenes.yaml \
   --ckpt checkpoints/prosim_demo_model.ckpt \
-  --rollout_name wosac_val_uncond_100scenes_debug \
+  --rollout_name wosac_val_uncond_100scenes_replace_batch \
   --save_vis false \
   --save_metric true \
   --cluster local
