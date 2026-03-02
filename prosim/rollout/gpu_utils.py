@@ -59,14 +59,14 @@ def get_waymo_specification(batch, config):
   waymo_scene = get_waymo_scene_object(scene_name, scene_template)
   sim_agent_ids = submission_specs.get_sim_agent_ids(waymo_scene)
 
-  batch_prompt_info = batch.extras['prompt']['motion_pred']
-  batch_agent_ids = batch_prompt_info['agent_ids'][0]
+  # Match reference: use batch.agent_names instead of prompt agent_ids
+  batch_agent_ids = batch.agent_names[0]
 
   valid_idx = []
   for i, agent_id in enumerate(batch_agent_ids):
     if 'ego' in agent_id or int(agent_id) in sim_agent_ids:
       valid_idx.append(i)
-  
+
   print('batch_agent_ids: ', batch_agent_ids)
   print('valid_idx: ', valid_idx)
   print('sim_agent_ids: ', sim_agent_ids)
@@ -76,30 +76,14 @@ def get_waymo_specification(batch, config):
 
   batch_agent_ids = [batch_agent_ids[i] for i in valid_idx]
   missed_agent_ids = [sim_agent_id for sim_agent_id in sim_agent_ids if str(sim_agent_id) not in batch_agent_ids]
-  
+
   assert len(missed_agent_ids) == 1
 
   ego_sim_agent_id = missed_agent_ids[0]
 
-  # subsample the batch_prompt info to only include the sim_agent_ids
-  for key in batch_prompt_info:
-    if type(batch_prompt_info[key]) == list:
-      batch_prompt_info[key][0] = [batch_prompt_info[key][0][i] for i in valid_idx]
-    elif type(batch_prompt_info[key]) == torch.Tensor:
-      batch_prompt_info[key] = batch_prompt_info[key][:, valid_idx]
+  # Match reference: do NOT subsample batch_prompt_info or remap conditions.
+  # The model was trained to see all agents; subsampling breaks its expectations.
 
-  if 'condition' in batch.extras and len(batch.extras['condition']) > 0:
-    _remap_condition_to_valid_agents(batch.extras['condition'], valid_idx)
-  
-  # if len(missed_agent_ids) > 0:
-  #   print('missed agent ids: ', missed_agent_ids)
-
-  #   invalid_tracks = [track for track in waymo_scene.tracks if track.id in missed_agent_ids]
-  #   for track in invalid_tracks:
-  #     print(track.id)
-  #     valid_state = [state for state in track.states if state.valid]
-  #     print('num valid states: ', len(valid_state))
-  
   return batch, waymo_scene, ego_sim_agent_id
 
 def replica_batch_for_parallel_rollout(scene_embs, policy_emds, prompt_encs, policy_agent_ids, agent_trajs, batch, M):
